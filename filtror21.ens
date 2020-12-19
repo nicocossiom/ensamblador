@@ -520,13 +520,12 @@ finFiltro:	or r1, r31, r0
 
 FiltRec:    
             or r28, r30, r0
-            ld r2, r30, 8      ; r2 = dir(ImagenIn)
-            ld r3, r30, 12     ; r3 = dir(ImagenFiltrada)
-            ld r4, r30, 16     ; r4 = dir(MFiltro)
+            ld r2, r30, 0      ; r2 = dir(ImagenIn)
+            ld r3, r30, 4     ; r3 = dir(ImagenOut)
+            ld r4, r30, 8     ; r4 = dir(MFiltro)
             ld r5, r2, 0      ; r5 = M
             ld r6, r2, 4      ; r6 = N
             mulu r7, r2, r3    ; r7 = M*N == nº de elementos Imagen
-
 
 ; multiplo de 4? (nºelems/4)*(4) == nº elems? --> se cumpple por el truncamiento en caso de que no sea divisible
 multiplo:   divu r8, r7, 4      ; (nºelems/4) 
@@ -538,30 +537,54 @@ multiplo:   divu r8, r7, 4      ; (nºelems/4)
             addu r7, r4, 1		
 			br multiplo
 
-endmult:	subu r30, r30, r7 	; reservamos espacio en pila para la imagen que va a devolver Filtro
+endmult:	subu r30, r30, r7 	; reservamos espacio en pila para ImagenOut
 			PUSH(r4) ; MFiltro a pila
 			PUSH(r3) ; ImFiltrada
 			PUSH(r2) ; ImagenIn
 			bsr Filtro
-			POP(r2) 
-			POP(r3) ; r2 = dir(ImFiltrada)
+			POP(r2)	; r2 = fir(ImagenIn) 
+			POP(r3) ; r3 = dir(ImagenOut)
 			POP(r4)
+			or r12, r0, 0 ; desplazamiento vs dir(ImagenTMP)
+			ld r5, r2, 0      ; r5 = M
+            ld r6, r2, 4      ; r6 = N
+            mulu r7, r2, r3    ; r7 = M*N == nº de elementos Imagen
 
-copia:					
+; PILA =  {(ImagenIn) (ImagenOut) (MFiltro) (NCambios) (MaxFiltrados) (IMAGENTMP) } <-r30
 
+copia:		cmp r14, r7, r12 
+			bb1 eq, r14, rComp				
+			ld.bu r13, r3, r12  ; elem a copiar de ImagenOut
+			st.b r13, r30, r12	;  elem copiado en ImagenTMP
+			addu r12, r12, 1  ;  r12++ = desplazamiento y contador
+			br copia
 
+rComp:		PUSH(r2)
+			PUSH(r3)
+			bsr Comp
+			POP(r2)
+			POP(r3)
+			PUSH(r29)  ;  result de Comp a pila  
+		
+rnFiltr:	sub r14, r0, 1;  r14 = -1
+			PUSH (r14)
+			bsr nFiltrados
+			addu r30, r30, 4; 
+			PUSH(r29)  ;  result de Comp a pila  
 
+; PILA =  {(ImagenIn) (ImagenOut) (MFiltro) (NCambios) (MaxFiltrados) (IMAGENTMP) (Comp) (nFiltrados)} <-r30
 
+keep:		ld r12, r30, 4  ;  r12 = resComp
+			ld r13, r30, 0  ;  r13 = resnFiltrados
+			ld r14, r30, 12 ;  r14 = MaxFiltrados
+			ld r15, r30, 16 ;  r15= NCambios
+			cmp r16, r12, 16;  
+			bb1 eq, r16, salRec9 
+			cmp r16, r13, r14
+			bb1 eq, r16, salRec8
+			br endmult ; recursion 
 
-
-
-
-
-
-
-
-
-
+salRec9:	or r29, r0, 0;  r29=0
 
 
 
