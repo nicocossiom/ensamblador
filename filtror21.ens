@@ -133,8 +133,12 @@ DBNZ:	MACRO(reg,ETI)
 		IMFILTRADAREC:
 		res 24
 		data 0x55555555, 0x55555555
-		
-				
+
+		NCambios:
+		data 400
+
+		MAXFILTRADO:
+		data 4
 ;====================================================================
 ;==========================PROGRAMA==================================
 ;====================================================================
@@ -225,10 +229,21 @@ PPnFiltro: 		LEA(r30, 60000)
 				POP(r16)
 				stop
 
-PPnFiltRec:		PUSH(r1)
-				POP(r1)
-				stop	
-
+PPnFiltRec:  	LEA(r30, 60000)
+				LEA(r25, IMREC)
+				LEA(r26, IMFILTRADAREC)
+				LEA(r22, FILTROREC)
+				LEA(r23, NCambios)
+				PUSH(r23)
+				PUSH(r22)
+				PUSH(r26)
+				PUSH(r25)
+				bsr FiltRec
+				POP(r25)
+				POP(r26)
+				POP(r22)
+				POP(r23)
+				stop
 
 
 
@@ -503,7 +518,36 @@ finFiltro:	or r1, r31, r0
 			
 ;==========================FiltRec============================
 
-;FiltRec:		
+FiltRec:    
+            or r28, r30, r0
+            ld r2, r30, 8      ; r2 = dir(ImagenIn)
+            ld r3, r30, 12     ; r3 = dir(ImagenFiltrada)
+            ld r4, r30, 16     ; r4 = dir(MFiltro)
+            ld r5, r2, 0      ; r5 = M
+            ld r6, r2, 4      ; r6 = N
+            mulu r7, r2, r3    ; r7 = M*N == nº de elementos Imagen
+
+
+; multiplo de 4? (nºelems/4)*(4) == nº elems? --> se cumpple por el truncamiento en caso de que no sea divisible
+multiplo:   divu r8, r7, 4      ; (nºelems/4) 
+            mulu r8, r8, 4      ; (nºelems/4)*(4)
+            cmp r11, r8, r7     ; (nºelems/4)*(4) == nº elems?
+		; True -> continuamos
+            bb1 eq, r11, endmult
+		; Falso ->    nº elems++ hasta que sea multiplo de 4
+            addu r7, r4, 1		
+			br multiplo
+
+endmult:	subu r30, r30, r7 	; reservamos espacio en pila para la imagen que va a devolver Filtro
+			PUSH(r4) ; MFiltro a pila
+			PUSH(r3) ; ImFiltrada
+			PUSH(r2) ; ImagenIn
+			bsr Filtro
+			POP(r2) 
+			POP(r3) ; r2 = dir(ImFiltrada)
+			POP(r4)
+
+copia:					
 
 
 
