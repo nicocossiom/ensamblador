@@ -75,7 +75,6 @@ DBNZ:	MACRO(reg,ETI)
 		data 0, 1, 0, 1, 0, 1
 		data 0, 1, 1, 1, 0, 1
 		data 0, 1, 0, 1, 0, 11
-			
 		
 		;SUBMATRIZ
 		org 2400
@@ -105,17 +104,17 @@ DBNZ:	MACRO(reg,ETI)
 
 		;Filtro
 		org 2800
-		IMFILTRO:
+		FIM:
         data 4, 8
         data 0x04030201, 0x07060504
         data 0x14134211, 0x17168514
         data 0x24232221, 0x27262574
         data 0x34333231, 0x37363534
 	
-		IMFILTRADA:
+		FILTRADA:
 			res 40
 		
-		MFILTRO: 
+		FFILTRO: 
 		data 0, 1, -3, 1, 0, 1
 		data 0,1, 4,1,0,1
 		data 0,1, 0,1,0,1
@@ -135,13 +134,6 @@ DBNZ:	MACRO(reg,ETI)
 		res 24
 		data 0x55555555, 0x55555555
 		
-		
-
-
-
-
-
- 
 				
 ;====================================================================
 ;==========================PROGRAMA==================================
@@ -220,16 +212,17 @@ PPnFilPixel:	LEA(r30, 60000)
 				POP(r15)
 				stop
 
-PPnFiltro: 		LEA(r14, MFILTRO)
-				LEA(r15, IMFILTRADA)
-				LEA(r16, IMFILTRO)
-				PUSH(r14)
-				PUSH(r15)
+PPnFiltro: 		LEA(r30, 60000)		
+				LEA(r14, FIM)		
+				LEA(r15, FILTRADA)
+				LEA(r16, FFILTRO)
 				PUSH(r16)
+				PUSH(r15)
+				PUSH(r14)
 				bsr Filtro
-				POP(r16)
-				POP(r15)
 				POP(r14)
+				POP(r15)
+				POP(r16)
 				stop
 
 PPnFiltRec:		PUSH(r1)
@@ -317,9 +310,9 @@ bucleComp:		cmp r24, r22, 0
 				subu r22, r22, 1; contador --
 				br bucleComp
 
-finComp: 		PUSH(r2)
+finComp: 		;PUSH(r2)
 				br Sqrt1d
-				POP(r2)
+				;POP(r2)
 				jmp(r1)
 	
 ;=====================VALORPIXEL================================				
@@ -387,14 +380,15 @@ contSM:			cmp r15, r8, 9;
 				addu r7, r7, 1; sig elemento IM
 				br bucleSM
 				
-finSM:			jmp(r1); 
+finSM:			
+				jmp(r1); 
 
 ;=======================FilPixel===========================================			
 		
-;Falla r30, no se suma cuando hay pop deberia ser EA5E=59998
 
 				;Inicializamos valores de los argumentos (IM, i, j, FILTRO)
-FilPixel:		ld r10, r30, 0; r10= dir(IM)
+FilPixel:		or r28, r1, r0;
+				ld r10, r30, 0; r10= dir(IM)				
 				or r14, r10, r0; copia dir(IM)
 				ld r11, r30, 12; r11= dir(FILTRO)
 				ld r4, r30, 4; r4=i
@@ -433,25 +427,26 @@ FilPixel:		ld r10, r30, 0; r10= dir(IM)
 				or r27, r30, r0 ; r27 = dir(subIM)
 				PUSH(r11) ; dir (Filtro)
 				PUSH(r27) ; dir(subIM)
-para:
 				bsr ValorPixel; ValorPixel(SubImagen, MFiltro)
+paraCabron:
 				POP(r27)
 				POP(r11)
+				addu r30, r30, 12 ; quitamos subIM de la pila, ya no hace falta
 				;Ajustamos resultado VPixel -> 0>=r29<=255
-				ld r24, r0, 255;
 				cmp r27, r29, 255
 				bb1 gt, r27, mayora255
 				cmp r27, r29,0;
 				bb1 lt, r27, menora0
-				
-				
-menora0:		ld r29, r0, 0;
 				br finFP;
 				
-mayora255:		ld r29, r0, 255;
+				
+menora0:		or r29, r0, 0;
 				br finFP;
 				
-finFP:			jmp(r1)
+mayora255:		or r29, r0, 255;
+
+finFP:			or r1, r28, r0;
+				jmp(r1)
 
 guardaPixel:	mulu r23, r22, r4; desplazamiento hasta (i, j)= numerocolumnas*i +j 
 				addu r23, r23, r5
@@ -461,39 +456,41 @@ guardaPixel:	mulu r23, r22, r4; desplazamiento hasta (i, j)= numerocolumnas*i +j
 				
 
 ;==========================Filtro============================
-
-Filtro: 	ld r2, r30, 0; r2=dir(IMAGEN)
+Filtro: 	or r31, r1, r0;
+			ld r2, r30, 0; r2=dir(IMAGEN)
 			ld r3, r30, 4; r3=dir(IMFILTRADA)
 			ld r4, r30, 8; r4=dir(MFILTRO)
 			ld r5, r2, 0; r5=M
 			ld r6, r2, 4; r6=N
-			st r3, r5, r0; M-->[dir(IMFILTRADA)]
-			addu r7, r3, 4;r7=dir(IMFILTRADA)+4
-			st r7, r6, r0; N-->[dir(IMFILTRADA)+4]
-			addu r7, r7, 4; r7=dir(IMFILTRADA)+8 = comienzo real IMFILTRADA
-			ld r8, r0, 0; i=r8=0
-			ld r12, r0, 0; r12=desplazamiento matriz
-			br fori
+			st r5, r3, r0; M-->[dir(IMFILTRADA)]
+			st r6, r3, 4; N-->[dir(IMFILTRADA)+4]
+			or r8, r0, r0; i=r8=0
+			addu r22, r3, 8; dir(primer elem IMFILTRADA)
 
-fori: 			
-			ld r9, r0, 0; j=r9=0
-			cmp r10, r8, r5
+fori:		ld r6, r2, 0 ; M (Hay que fetchearlo de la imagen en memoria por cada it)
+			cmp r10, r8, r6
 			bb1 eq, r10, finFiltro
-			bb0 eq, r10, forj
+			or r9, r0, r0; j=r9=0
 
-forj: 			cmp r10, r9, r6
+forj: 		
+			ld r7, r2, 4 ; M (Hay que fetchearlo de la imagen en memoria por cada it)
+			cmp r10, r9, r7
 			bb1 eq, r10, incrementi
+			PUSH (r22) ; dir(IMFILTRADA) correspondiente, a pila para después de FilPixel
 			PUSH(r4); dir(FILTRO) a pila
 			PUSH(r9);j a pila
 			PUSH(r8);i a pila
 			PUSH(r2); dir(IMAGEN) a pila
 			bsr FilPixel
 			;Sacamos de pila los parametros, orden contrario a PUSH
+parose:
 			POP(r2)
 			POP(r8)
 			POP(r9)
 			POP(r4)
-			st.b r29, r7, r12
+			POP(r22)
+			st.b r29, r22, r0;
+			addu r22, r22, 1 ; sig elemento IMFILTRADA
 			addu r9, r9, 1; j++
 			br forj
 
@@ -501,7 +498,8 @@ forj: 			cmp r10, r9, r6
 incrementi: addu r8, r8, 1; i++
 			br fori
 
-finFiltro:		jmp(r1)
+finFiltro:	or r1, r31, r0
+			jmp(r1)
 			
 ;==========================FiltRec============================
 
