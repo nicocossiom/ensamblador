@@ -518,7 +518,7 @@ finFiltro:	or r1, r31, r0
 			
 ;==========================FiltRec============================
 
-FiltRec:    
+FiltRec:    or r31, r30, r0;
             or r28, r30, r0
             ld r2, r30, 0      ; r2 = dir(ImagenIn)
             ld r3, r30, 4     ; r3 = dir(ImagenOut)
@@ -537,7 +537,9 @@ multiplo:   divu r8, r7, 4      ; (nºelems/4)
             addu r7, r4, 1		
 			br multiplo
 
-endmult:	subu r30, r30, r7 	; reservamos espacio en pila para ImagenOut
+endmult:	or r22, r30, r0;
+			subu r30, r30, r7 	; reservamos espacio en pila para ImagenTMP
+			PUSH(r22)
 			PUSH(r4) ; MFiltro a pila
 			PUSH(r3) ; ImFiltrada
 			PUSH(r2) ; ImagenIn
@@ -545,10 +547,8 @@ endmult:	subu r30, r30, r7 	; reservamos espacio en pila para ImagenOut
 			POP(r2)	; r2 = fir(ImagenIn) 
 			POP(r3) ; r3 = dir(ImagenOut)
 			POP(r4)
+			POP(r23)
 			or r12, r0, 0 ; desplazamiento vs dir(ImagenTMP)
-			ld r5, r2, 0      ; r5 = M
-            ld r6, r2, 4      ; r6 = N
-            mulu r7, r2, r3    ; r7 = M*N == nº de elementos Imagen
 
 ; PILA =  {(ImagenIn) (ImagenOut) (MFiltro) (NCambios) (MaxFiltrados) (IMAGENTMP) } <-r30
 
@@ -570,21 +570,49 @@ rnFiltr:	sub r14, r0, 1;  r14 = -1
 			PUSH (r14)
 			bsr nFiltrados
 			addu r30, r30, 4; 
-			PUSH(r29)  ;  result de Comp a pila  
+			PUSH(r29)  ;  result de nFiltrados a pila  
 
-; PILA =  {(ImagenIn) (ImagenOut) (MFiltro) (NCambios) (MaxFiltrados) (IMAGENTMP) (Comp) (nFiltrados)} <-r30
+; PILA =  {(ImagenIn) (ImagenOut) (MFiltro) (NCambios) (MaxFiltrados) (IMAGENTMP) (Comp) (nFiltrados) } <-r30
 
-keep:		ld r12, r30, 4  ;  r12 = resComp
-			ld r13, r30, 0  ;  r13 = resnFiltrados
-			ld r14, r30, 12 ;  r14 = MaxFiltrados
-			ld r15, r30, 16 ;  r15= NCambios
-			cmp r16, r12, 16;  
-			bb1 eq, r16, salRec9 
+keep:		
+			POP(r13);  r13 = resnFiltrados
+			POP(r12);  r12 = resComp
+			POP(r19);  r18 = numeroElems
+			addu r19, r18, r30 ; r19 = dir(dir(IMAGENTMP)) en pilas
+			ld r14, r19, 4 ;  r14 = MaxFiltrados
+			ld r15, r19, 8 ;  r15= NCambios
+			;Comprobaciones de while
+			cmp r16, r12, r15;  
+			bb1 eq, r16, finFiltRec
 			cmp r16, r13, r14
-			bb1 eq, r16, salRec8
+			bb1 eq, r16, salRec
 			br endmult ; recursion 
 
-salRec9:	or r29, r0, 0;  r29=0
+salRec:	
+			PUSH (r14) ; MaxFiltrados a pila
+			PUSH (r15) ; NCambios a pila
+			ld r22, r19, 12 ; r22= dir(MFiltro)
+			PUSH(r22) ;  MFiltro a pila
+			ld r21, r19, 16 ; r21 = dir(ImagenOut)
+			PUSH(r21)  ; dir(ImagenOut) a pila
+			ld r20, r19, 0 ; r19 = dir(IMAGENTMP)
+			PUSH(r20) ; dir(IMAGENTMP)
+			
+; PILA =  {(ImagenIn) (ImagenOut) (MFiltro) (NCambios) (MaxFiltrados) (IMAGENTMP) ... 
+;	 ...  (IMAGENTMP(IMIN)) (ImagenOut) (MFiltro) (NCambios) (MaxFiltrados) } <-r30
+
+			bsr FiltRec;
+			addu r30, r30 12  ; desapilo  (MFiltro) (NCambios) (MaxFiltrados) 
+			POP(r3)  ; r2 = nCambios
+			st r3, r31, 4;  
+			POP(r4)  ; r4 = MaxFiltrados
+			st r4, r31, 8  
+
+
+
+finFiltRec:		
+				jmp(r1)
+				or r29, r0, 0;  r29=0
 
 
 
