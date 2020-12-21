@@ -44,7 +44,7 @@ DBNZ:	MACRO(reg,ETI)
 ;====================================================================
 		;nFiltrados
 		org 0
-		data 0x0E
+		data 0
 		org 400
 		data -1
 		;Sqrt1d
@@ -271,7 +271,8 @@ endNfiltr: 		st r29,r0,0      ; nF a memoria [0]
 				jmp(r1)      ; salta a PC y end
 
 ;=========================SQRT=================================
-Sqrt1d:			ld r2, r30, 0 ; inicializamos Num desde la pila, r2 como registro auxiliar
+Sqrt1d:				
+				ld r2, r30, 0 ; inicializamos Num desde la pila, r2 como registro auxiliar
 				cmp r3, r2, 2 ;
 				bb1 lt, r3, sqles;
 				bb0 lt, r3, inisq;
@@ -537,7 +538,8 @@ finFiltro:
 FiltRec:    
 			PUSH(r1)
 			PUSH(r31)
-            or r19, r30, r0
+			or r31, r30, 4;		
+            or r19, r30, 8
             ld r2, r30, 8      ; r2 = dir(ImagenIn)
             ld r3, r30, 12     ; r3 = dir(ImagenOut)
             ld r4, r30, 16    ; r4 = dir(MFiltro)
@@ -562,20 +564,21 @@ filtroR:	addu r7, r7, 8;  añadimos + 8 para acomodar M y N
 			PUSH(r3) ; ImFiltrada
 			PUSH(r2) ; ImagenIn
 			bsr Filtro
-finFiltroR: POP(r2)	; r2 = fir(ImagenIn) 
+finFiltroR: POP(r2)	; r2 = dir(ImagenIn) 
 			POP(r3) ; r3 = dir(ImagenOut)
 			POP(r4)
 
 ; PILA =  { (MaxFiltrados) (NCambios) (MFiltro) (ImagenOut) (ImagenIn) (IMAGENTMP) (nº de elementos Imagen) } <-r30 
 			ld r7, r30, 0; r7 = numero de elems
 			ld r14, r3, 0; M de ImagenOut
-			st r14, r30, 4; M a IMAGENTMP en pila
+			st r14, r30, 8; M a IMAGENTMP en pila
 			ld r14, r3, 4;  N de ImagenOut
-			st r14, r30, 8;  N a IMAGENTMP en pila
+			st r14, r30, 12
+			;  N a IMAGENTMP en pila
 			or r12, r0, 0 ; desplazamiento vs dir(ImagenTMP)
 			subu r7, r7, 8; Ajustamos num elems para que sea correcto			
 			addu r3, r3, 8;
-			addu r4, r30, 12; puntero a primer elemento IMAGENTMP
+			addu r4, r30, 16; puntero a primer elemento IMAGENTMP
 
 
 copia:		cmp r14, r7, r12 
@@ -591,26 +594,28 @@ rComp:		subu r3, r3, 8
 			bsr Comp
 			POP(r2)
 			POP(r3)
-		;CASO BASE 1 -> comp < NCambios
-			cmp r16, r29, r15;  
-			bb1 lt, r16, salRec1;
-
+			PUSH(r29)  ;  result de Comp a pila  
+		
 rnFiltr: 	
 			sub r14, r0, 1;  r14 = -1
 			PUSH (r14)
 			bsr nFiltrados
 			addu r30, r30, 4; POP sin return last 
 
-keep:		 
-			ld r18, r30, 0;  r18 = numeroElems
-; PILA =  { (MaxFiltrados) (NCambios) (MFiltro) (ImagenOut) (ImagenIn)<-r19 (IMAGENTMP) (nº de elementos Imagen) } <-r30
-			addu r19, r18, r30 ; r19 = dir(ImagenIn) en pila
-			addu r19, r19, 4;
-			ld r14, r19, 16 ;  r14 = MaxFiltrados
-			ld r15, r19, 12;  r15= NCambios
+; PILA =  { (MaxFiltrados) (NCambios) (MFiltro) (ImagenOut) (ImagenIn) (IMAGENTMP) (nº de elementos Imagen) (Comp) } <-r30 
 
-		;CASO BASE 2-> nFiltrados = MaxFiltrados
-			cmp r16, r29, r14
+actualiza:		
+			POP(r12);  r12 = resComp
+			ld r15, r31, 12  ;  r15= NCambios
+			st r12, r31, 20  ;	actualizamos In x Out
+			ld r14, r31, 16  ;  r14 = MaxFiltrados
+			st r29, r31, 24  ;  actualizamos In x Out
+
+			;CASO BASE 1 -> comp < NCambios
+			cmp r16, r12, r15;  
+			bb1 lt, r16, salRec1;
+			;CASO BASE 2-> nFiltrados = MaxFiltrados
+			cmp r16, r13, r14
 			bb1 eq, r16, salRec2
 			;recursividad
 			br Rec
@@ -621,16 +626,16 @@ salRec1:	or r29, r0, 0;  r29=0
 salRec2:	sub r29, r0, 1;  r29=-1
 			br finFiltRec	 
 
-; PILA =  { (MaxFiltrados) (NCambios) (MFiltro) (ImagenOut) (ImagenIn)<-r19 (IMAGENTMP) (nº de elementos Imagen) <-r30
+; PILA =  { (MaxFiltrados) (NCambios) (MFiltro) (ImagenOut) (ImagenIn)<-r31 (IMAGENTMP) (nº de elementos Imagen) <-r30
 Rec:	
-			or r31, r30, 4; r31 = dir(IMAGENTMP)
-			ld r22, r19, 8 ; r22= dir(MFiltro)
-			ld r21, r19, 4 ; r21 = dir(ImagenOut)
+			or r19, r30, 4; r31 = dir(IMAGENTMP)
+			ld r22, r31, 8 ; r22= dir(MFiltro)
+			ld r21, r31, 4 ; r21 = dir(ImagenOut)
 			PUSH (r14) ; MaxFiltrados a pila
 			PUSH (r15) ; NCambios a pila
 			PUSH(r22) ;  MFiltro a pila
 			PUSH(r21)  ; dir(ImagenOut) a pila
-			PUSH(r31)  ; dir(IMAGENTMP) = nuevaImagenIn |  a pila
+			PUSH(r19)  ; dir(IMAGENTMP) = nuevaImagenIn |  a pila
 			
 ; 			....      (MaxFiltrados) (NCambios) (MFiltro) dir((ImagenOut)) (dir(IMTMP)) (IMTMP2) (nº de elementos Imagen) } <-r30
 ; PILA =  { (MaxFiltrados) (NCambios) (MFiltro) (ImagenOut) (ImagenIn)<-r19 (IMAGENTMP) (nº de elementos Imagen) ...  
@@ -647,10 +652,11 @@ finRec:
 			addu r30, r30, 12  ; desapilo  (MFiltro) (ImagenOut) (ImagenIn)
 			POP(r4)   ;  r4 = NCambios
 			POP(r5)   ;  r5 = MaxFiltrados
-			addu r19, r2, r30; dir (ImIn) en pila 
-			addu r19, r19 ,20 ;
-			st r4, r19, 0;
-			st r5, r19, 4;
+			st r4, r31, 12;
+			st r5, r31, 16;
 
-finFiltRec:		
+finFiltRec: 
+			addu r30, r30, 28; 
+			POP(r31)	
+			POP(r1)
 			jmp(r1)
