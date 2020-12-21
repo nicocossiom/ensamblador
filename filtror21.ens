@@ -557,7 +557,7 @@ multiplo:   divu r8, r7, 4      ; (nºelems/4)
 
 filtroR:	addu r7, r7, 8;  añadimos + 8 para acomodar M y N
 			subu r30, r30, r7 	; reservamos espacio en pila para ImagenTMP
-			PUSH(r19)
+			PUSH(r7)
 			PUSH(r4) ; MFiltro a pila
 			PUSH(r3) ; ImFiltrada
 			PUSH(r2) ; ImagenIn
