@@ -368,7 +368,6 @@ finVPixel:		divs r29, r2, 256; r29=ACC/256
 ;=======================SUBMATRIZ===========================================
 				;desplazamiento hasta (i, j)= numerocolumnas*i + j 
 SubMatriz:		
-				PUSH(r1)
 				or r28, r30, 4
 				ld r10, r28, 0; r10= dir(IM)
 				ld r11, r28, 4; r11= dir(SUBIM)
@@ -408,7 +407,7 @@ contSM:			cmp r15, r8, 9;
 				addu r7, r7, 1; sig elemento IM
 				br bucleSM
 				
-finSM:			POP(r1)
+finSM:		
 				jmp(r1); 
 
 ;=======================FilPixel===========================================			
